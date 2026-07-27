@@ -19,4 +19,6 @@ model lead {
   companyName String?
   message     String?
   emailVerified Boolean?
+  emailVerificationStatus String @default("not_started")
+  emailVerificationRunId String?
 }

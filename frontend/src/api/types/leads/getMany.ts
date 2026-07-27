@@ -12,4 +12,5 @@ export type LeadsGetManyOutput = {
   companyName: string | null
   message: string | null
   emailVerified: boolean | null
+  emailVerificationStatus: 'not_started' | 'pending' | 'verified' | 'not_verified' | 'failed'
 }[]
