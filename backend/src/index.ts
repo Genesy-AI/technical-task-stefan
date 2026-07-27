@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client'
 import express, { Request, Response } from 'express'
 import { Connection, Client } from '@temporalio/client'
 import { verifyEmailWorkflow } from './workflows'
+import { isValidBulkImportLead, normalizeCountryCode } from './utils/leadValidation'
 import { generateMessageFromTemplate } from './utils/messageGenerator'
 import { runTemporalWorker } from './worker'
 const prisma = new PrismaClient()
@@ -179,24 +180,13 @@ app.post('/leads/bulk', async (req: Request, res: Response) => {
   }
 
   try {
-    const validLeads = leads.filter((lead) => {
-      return (
-        lead.firstName &&
-        lead.lastName &&
-        lead.email &&
-        typeof lead.firstName === 'string' &&
-        lead.firstName.trim() &&
-        typeof lead.lastName === 'string' &&
-        lead.lastName.trim() &&
-        typeof lead.email === 'string' &&
-        lead.email.trim()
-      )
-    })
+    const validLeads = leads.filter(isValidBulkImportLead)
 
     if (validLeads.length === 0) {
-      return res
-        .status(400)
-        .json({ error: 'No valid leads found. firstName, lastName, and email are required.' })
+      return res.status(400).json({
+        error:
+          'No valid leads found. firstName, lastName, and email are required; countryCode must be a valid ISO alpha-2 code.',
+      })
     }
 
     const existingLeads = await prisma.lead.findMany({
@@ -227,7 +217,7 @@ app.post('/leads/bulk', async (req: Request, res: Response) => {
             lastName: lead.lastName.trim(),
             email: lead.email.trim(),
             jobTitle: lead.jobTitle ? lead.jobTitle.trim() : null,
-            countryCode: lead.countryCode ? lead.countryCode.trim() : null,
+            countryCode: normalizeCountryCode(lead.countryCode) || null,
             companyName: lead.companyName ? lead.companyName.trim() : null,
           },
         })

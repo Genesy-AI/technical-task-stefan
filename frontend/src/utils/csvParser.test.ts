@@ -154,6 +154,26 @@ John,Doe,john@example.com,,`
     expect(result[0].isValid).toBe(true)
   })
 
+  it.each(['12', 'XXX', 'ZZ'])('should reject invalid country code %s', (countryCode) => {
+    const csv = `firstName,lastName,email,countryCode
+Amanda,James,amanda@example.com,${countryCode}`
+
+    const result = parseCsv(csv)
+
+    expect(result[0].isValid).toBe(false)
+    expect(result[0].errors).toContain('Invalid country code')
+  })
+
+  it('should normalize a lowercase country code', () => {
+    const csv = `firstName,lastName,email,countryCode
+Amanda,James,amanda@example.com,es`
+
+    const result = parseCsv(csv)
+
+    expect(result[0].countryCode).toBe('ES')
+    expect(result[0].isValid).toBe(true)
+  })
+
   it('should preserve row index correctly', () => {
     const csv = `firstName,lastName,email
 John,Doe,john@example.com
