@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { FC, useState } from 'react'
 import toast from 'react-hot-toast'
 import { api } from '../api'
+import { normalizeCountryCode } from '../utils/countryCode'
 import { MessageTemplateModal } from './MessageTemplateModal'
 import { CsvImportModal } from './CsvImportModal'
 
@@ -273,7 +274,7 @@ export const LeadsList: FC = () => {
                     <div className="text-sm text-gray-900">{lead.companyName || '-'}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{lead.countryCode || '-'}</div>
+                    <div className="text-sm text-gray-900">{normalizeCountryCode(lead.countryCode) || '-'}</div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="text-sm text-gray-900 max-w-xs truncate" title={lead.message || ''}>
