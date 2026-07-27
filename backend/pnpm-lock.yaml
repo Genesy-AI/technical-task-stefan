@@ -23,6 +23,9 @@ importers:
         specifier: ^5.1.0
         version: 5.1.0
     devDependencies:
+      '@temporalio/testing':
+        specifier: 1.13.0
+        version: 1.13.0
       '@types/express':
         specifier: ^5.0.3
         version: 5.0.3
@@ -727,6 +730,10 @@ packages:
 
   '@temporalio/proto@1.13.0':
     resolution: {integrity: sha512-jplwOQAgghdRJljTVI9Lawar4L0vGM+vT0TfxvKm+/hVf4CpPEAwvy+El9doR4wu1uYg9g94LnPmZdzoUu5qyA==}
+    engines: {node: '>= 18.0.0'}
+
+  '@temporalio/testing@1.13.0':
+    resolution: {integrity: sha512-YTOLYjg+4lKuopRMKeuUBQ5+/W/t01JKH8Gd0uJgjHIO1FaiOCMlfB2IoND9VzfjYS6UD7Wu9kCsQwdp9xtnLg==}
     engines: {node: '>= 18.0.0'}
 
   '@temporalio/worker@1.13.0':
@@ -2951,6 +2958,22 @@ snapshots:
     dependencies:
       long: 5.3.2
       protobufjs: 7.5.4
+
+  '@temporalio/testing@1.13.0':
+    dependencies:
+      '@temporalio/activity': 1.13.0
+      '@temporalio/client': 1.13.0
+      '@temporalio/common': 1.13.0
+      '@temporalio/core-bridge': 1.13.0
+      '@temporalio/proto': 1.13.0
+      '@temporalio/worker': 1.13.0
+      '@temporalio/workflow': 1.13.0
+      abort-controller: 3.0.0
+    transitivePeerDependencies:
+      - '@swc/helpers'
+      - esbuild
+      - uglify-js
+      - webpack-cli
 
   '@temporalio/worker@1.13.0':
     dependencies:

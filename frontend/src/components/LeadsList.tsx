@@ -2,8 +2,20 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { FC, useState } from 'react'
 import toast from 'react-hot-toast'
 import { api } from '../api'
+import {
+  getEmailVerificationErrorMessage,
+  getEmailVerificationSummary,
+} from '../utils/emailVerification'
 import { MessageTemplateModal } from './MessageTemplateModal'
 import { CsvImportModal } from './CsvImportModal'
+
+const emailVerificationIndicators = {
+  not_started: '➖',
+  pending: '❓',
+  verified: '✅',
+  not_verified: '❌',
+  failed: '⚠️',
+} as const
 
 export const LeadsList: FC = () => {
   const [selectedLeads, setSelectedLeads] = useState<number[]>([])
@@ -40,14 +52,16 @@ export const LeadsList: FC = () => {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['leads', 'getMany'] })
       setIsEnrichDropdownOpen(false)
-      toast.success(
-        data.verifiedCount === 1
-          ? `Verified ${data.verifiedCount} email`
-          : `Verified ${data.verifiedCount} emails`
-      )
+      const summary = getEmailVerificationSummary(data)
+
+      if (summary.hasErrors) {
+        toast.error(summary.message)
+      } else {
+        toast.success(summary.message)
+      }
     },
-    onError: () => {
-      toast.error('Failed to verify emails. Please try again.')
+    onError: (error) => {
+      toast.error(getEmailVerificationErrorMessage(error))
     }
   })
 
@@ -149,13 +163,14 @@ export const LeadsList: FC = () => {
                     </button>
                     <button
                       onClick={() => verifyEmailsMutation.mutate(selectedLeads)}
-                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                      disabled={verifyEmailsMutation.isPending}
+                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors disabled:cursor-wait disabled:opacity-60"
                     >
                       <div className="flex items-center">
                         <svg className="mr-3 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12H8m8 0a8 8 0 11-16 0 8 8 0 0116 0zm-8 0V4" />
                         </svg>
-                        Verify Email
+                        {verifyEmailsMutation.isPending ? 'Verifying…' : 'Verify Email'}
                       </div>
                     </button>
                     <button
@@ -264,7 +279,10 @@ export const LeadsList: FC = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{lead.email || '-'} {lead.emailVerified === null ? '❓' : lead.emailVerified ? '✅' : '❌'}</div>
+                    <div className="text-sm text-gray-900">
+                      {lead.email || '-'}{' '}
+                      {emailVerificationIndicators[lead.emailVerificationStatus]}
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">{lead.jobTitle || '-'}</div>

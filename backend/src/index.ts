@@ -1,9 +1,13 @@
 import { PrismaClient } from '@prisma/client'
 import express, { Request, Response } from 'express'
 import { Connection, Client } from '@temporalio/client'
-import { verifyEmailWorkflow } from './workflows'
 import { generateMessageFromTemplate } from './utils/messageGenerator'
 import { runTemporalWorker } from './worker'
+import {
+  EmailVerificationRepository,
+  EmailVerificationServiceUnavailableError,
+  verifyEmailBatch,
+} from './services/emailVerification'
 const prisma = new PrismaClient()
 const app = express()
 app.use(express.json())
@@ -273,43 +277,71 @@ app.post('/leads/verify-emails', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'No leads found with the provided IDs' })
     }
 
-    const connection = await Connection.connect({ address: 'localhost:7233' })
-    const client = new Client({ connection, namespace: 'default' })
-
-    let verifiedCount = 0
-    const results: Array<{ leadId: number; emailVerified: boolean }> = []
-    const errors: Array<{ leadId: number; leadName: string; error: string }> = []
-
-    for (const lead of leads) {
-      try {
-        const isVerified = await client.workflow.execute(verifyEmailWorkflow, {
-          taskQueue: 'myQueue',
-          workflowId: `verify-email-${lead.id}-${Date.now()}`,
-          args: [lead.email],
+    const repository: EmailVerificationRepository = {
+      markPending: async (ids, runId) => {
+        await prisma.lead.updateMany({
+          where: { id: { in: ids } },
+          data: {
+            emailVerified: null,
+            emailVerificationStatus: 'pending',
+            emailVerificationRunId: runId,
+          },
         })
-
-        await prisma.lead.update({
-          where: { id: lead.id },
-          data: { emailVerified: Boolean(isVerified) },
+      },
+      saveResult: async (id, runId, emailVerified) => {
+        await prisma.lead.updateMany({
+          where: { id, emailVerificationRunId: runId },
+          data: {
+            emailVerified,
+            emailVerificationStatus: emailVerified ? 'verified' : 'not_verified',
+          },
         })
-
-        results.push({ leadId: lead.id, emailVerified: isVerified })
-        verifiedCount += 1
-      } catch (error) {
-        errors.push({
-          leadId: lead.id,
-          leadName: `${lead.firstName} ${lead.lastName}`.trim(),
-          error: error instanceof Error ? error.message : 'Unknown error',
+      },
+      saveFailure: async (id, runId) => {
+        await prisma.lead.updateMany({
+          where: { id, emailVerificationRunId: runId },
+          data: {
+            emailVerified: null,
+            emailVerificationStatus: 'failed',
+          },
         })
-      }
+      },
     }
 
-    await connection.close()
+    const { results, errors } = await verifyEmailBatch({
+      leads,
+      repository,
+      connect: async () => {
+        const connection = await Connection.connect({
+          address: 'localhost:7233',
+          connectTimeout: '10 seconds',
+        })
+        const client = new Client({ connection, namespace: 'default' })
 
-    res.json({ success: true, verifiedCount, results, errors })
+        return {
+          workflow: {
+            execute: (workflow, options) => client.workflow.execute(workflow, options),
+          },
+          close: () => connection.close(),
+        }
+      },
+    })
+
+    const verifiedCount = results.filter((result) => result.emailVerified).length
+    res.json({ success: errors.length === 0, verifiedCount, results, errors })
   } catch (error) {
+    if (error instanceof EmailVerificationServiceUnavailableError) {
+      return res.status(503).json({
+        code: 'EMAIL_VERIFICATION_UNAVAILABLE',
+        error: error.message,
+      })
+    }
+
     console.error('Error verifying emails:', error)
-    res.status(500).json({ error: 'Failed to verify emails' })
+    res.status(500).json({
+      code: 'EMAIL_VERIFICATION_FAILED',
+      error: 'Could not save email verification results. Please try again.',
+    })
   }
 })
 
